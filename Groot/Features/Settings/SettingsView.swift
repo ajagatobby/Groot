@@ -11,14 +11,21 @@ import SwiftData
 // MARK: - Settings View
 
 struct SettingsView: View {
+    
+    // MARK: - Environment
+    
     @Environment(\.modelContext) private var modelContext
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
+    
     @Query private var settings: [AppSettings]
     
-    @State private var showResetAlert = false
-    @State private var isSyncing = false
-    @State private var showToast = false
-    @State private var toastMessage = ""
+    // MARK: - ViewModel
+    
+    @State private var viewModel: SettingsViewModel?
+    
+    // MARK: - Computed Properties
     
     private var appSettings: AppSettings? {
         settings.first
@@ -52,19 +59,34 @@ struct SettingsView: View {
                         .foregroundStyle(Color.grootBark)
                 }
             }
-            .alert("Reset Onboarding?", isPresented: $showResetAlert) {
+            .alert("Reset Onboarding?", isPresented: Binding(
+                get: { viewModel?.showResetAlert ?? false },
+                set: { viewModel?.showResetAlert = $0 }
+            )) {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive) {
-                    resetOnboarding()
+                    viewModel?.resetOnboarding(settings: appSettings)
                 }
             } message: {
                 Text("The app will restart and show the welcome screen.")
             }
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
         .task {
-            await callBlockingService.checkExtensionStatus()
-            await callBlockingService.refreshStats()
+            await viewModel?.onAppear()
+        }
+        .onAppear {
+            if viewModel == nil {
+                let vm = SettingsViewModel(callBlockingService: callBlockingService)
+                vm.configure(with: modelContext)
+                viewModel = vm
+            }
         }
     }
     
@@ -72,13 +94,13 @@ struct SettingsView: View {
     
     private var callDirectorySection: some View {
         CallDirectoryStatusCard(
-            status: callBlockingService.extensionStatus,
-            isSyncing: isSyncing,
+            status: viewModel?.extensionStatus ?? .unknown,
+            isSyncing: viewModel?.isSyncing ?? false,
             onOpenSettings: {
-                callBlockingService.openCallBlockingSettings()
+                viewModel?.openCallBlockingSettings()
             },
             onSync: {
-                syncCallDirectory()
+                viewModel?.syncCallDirectory()
             }
         )
         .grootAppear(delay: 0)
@@ -93,11 +115,7 @@ struct SettingsView: View {
                 iconColor: .grootFlame,
                 isOn: Binding(
                     get: { appSettings?.blockUnknownCallers ?? true },
-                    set: { newValue in
-                        appSettings?.blockUnknownCallers = newValue
-                        AppGroupContainer.blockUnknownCallers = newValue
-                        try? modelContext.save()
-                    }
+                    set: { viewModel?.updateBlockUnknownCallers($0, settings: appSettings) }
                 )
             )
             
@@ -110,10 +128,7 @@ struct SettingsView: View {
                 iconColor: .grootSun,
                 isOn: Binding(
                     get: { appSettings?.silentMode ?? false },
-                    set: { newValue in
-                        appSettings?.silentMode = newValue
-                        try? modelContext.save()
-                    }
+                    set: { viewModel?.updateSilentMode($0, settings: appSettings) }
                 )
             )
         }
@@ -128,10 +143,7 @@ struct SettingsView: View {
                 iconColor: .grootSky,
                 isOn: Binding(
                     get: { appSettings?.notificationsEnabled ?? true },
-                    set: { newValue in
-                        appSettings?.notificationsEnabled = newValue
-                        try? modelContext.save()
-                    }
+                    set: { viewModel?.updateNotificationsEnabled($0, settings: appSettings) }
                 )
             )
             
@@ -143,10 +155,7 @@ struct SettingsView: View {
                 iconColor: .grootViolet,
                 isOn: Binding(
                     get: { appSettings?.hapticsEnabled ?? true },
-                    set: { newValue in
-                        appSettings?.hapticsEnabled = newValue
-                        try? modelContext.save()
-                    }
+                    set: { viewModel?.updateHapticsEnabled($0, settings: appSettings) }
                 )
             )
         }
@@ -157,7 +166,7 @@ struct SettingsView: View {
         GrootListSection("statistics") {
             GrootListItem(
                 "blocked numbers",
-                subtitle: "\(callBlockingService.blockedNumbersCount)",
+                subtitle: "\(viewModel?.blockedNumbersCount ?? 0)",
                 icon: "hand.raised.fill",
                 iconColor: .grootFlame,
                 accessory: .none
@@ -167,7 +176,7 @@ struct SettingsView: View {
             
             GrootListItem(
                 "active patterns",
-                subtitle: "\(callBlockingService.patternsCount)",
+                subtitle: "\(viewModel?.patternsCount ?? 0)",
                 icon: "number",
                 iconColor: .grootViolet,
                 accessory: .none
@@ -177,7 +186,7 @@ struct SettingsView: View {
             
             GrootListItem(
                 "blocked countries",
-                subtitle: "\(callBlockingService.blockedCountriesCount)",
+                subtitle: "\(viewModel?.blockedCountriesCount ?? 0)",
                 icon: "globe",
                 iconColor: .grootSky,
                 accessory: .none
@@ -230,7 +239,7 @@ struct SettingsView: View {
     private var developerSection: some View {
         GrootListSection("developer") {
             Button {
-                showResetAlert = true
+                viewModel?.showResetOnboardingAlert()
             } label: {
                 HStack(spacing: 16) {
                     ZStack {
@@ -261,37 +270,6 @@ struct SettingsView: View {
         .grootAppear(delay: 0.6)
     }
     #endif
-    
-    // MARK: - Actions
-    
-    private func syncCallDirectory() {
-        isSyncing = true
-        Task {
-            do {
-                try await callBlockingService.reloadCallDirectory()
-                toastMessage = "Sync complete!"
-                showToast = true
-                GrootHaptics.success()
-            } catch {
-                toastMessage = "Sync failed"
-                showToast = true
-                GrootHaptics.error()
-            }
-            isSyncing = false
-        }
-    }
-    
-    private func resetOnboarding() {
-        if let settings = appSettings {
-            settings.hasCompletedOnboarding = false
-            settings.onboardingCompletedAt = nil
-            try? modelContext.save()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                exit(0)
-            }
-        }
-    }
 }
 
 // MARK: - Preview

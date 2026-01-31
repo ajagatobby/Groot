@@ -11,22 +11,19 @@ import SwiftData
 // MARK: - Whitelist View
 
 struct WhitelistView: View {
-    @Environment(\.modelContext) private var modelContext
+    
+    // MARK: - Environment
+    
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
     
     @Query(sort: \WhitelistContact.addedAt, order: .reverse)
     private var whitelistContacts: [WhitelistContact]
     
-    @State private var showContactPicker = false
-    @State private var showManualEntry = false
-    @State private var showToast = false
-    @State private var toastMessage = ""
-    @State private var contacts: [ContactInfo] = []
-    @State private var isLoadingContacts = false
+    // MARK: - ViewModel
     
-    private var totalCallsAllowed: Int {
-        whitelistContacts.reduce(0) { $0 + $1.callsAllowed }
-    }
+    @State private var viewModel: WhitelistViewModel?
     
     // MARK: - Body
     
@@ -36,19 +33,19 @@ struct WhitelistView: View {
                 LazyVStack(spacing: 20) {
                     WhitelistStatsRow(
                         totalContacts: whitelistContacts.count,
-                        callsAllowed: totalCallsAllowed
+                        callsAllowed: viewModel?.totalCallsAllowed(from: whitelistContacts) ?? 0
                     )
                     .grootAppear(delay: 0)
                     
                     AddWhitelistContactCard(
-                        onAddFromContacts: { showContactPicker = true },
-                        onAddManually: { showManualEntry = true }
+                        onAddFromContacts: { viewModel?.openContactPicker() },
+                        onAddManually: { viewModel?.openManualEntry() }
                     )
                     .grootAppear(delay: 0.1)
                     
                     if whitelistContacts.isEmpty {
                         GrootEmptyState.noWhitelistContacts {
-                            showManualEntry = true
+                            viewModel?.openManualEntry()
                         }
                         .grootAppear(delay: 0.2)
                     } else {
@@ -68,22 +65,39 @@ struct WhitelistView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     GrootIconButton("plus", variant: .primary, size: .small) {
-                        showManualEntry = true
+                        viewModel?.openManualEntry()
                     }
                 }
             }
         }
-        .sheet(isPresented: $showContactPicker) {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showContactPicker ?? false },
+            set: { viewModel?.showContactPicker = $0 }
+        )) {
             ContactPickerSheet(onSelect: { contact in
-                addContactToWhitelist(contact)
+                viewModel?.addContactToWhitelist(contact)
             })
             .presentationDetents([.large])
         }
-        .sheet(isPresented: $showManualEntry) {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showManualEntry ?? false },
+            set: { viewModel?.showManualEntry = $0 }
+        )) {
             AddWhitelistManualSheet()
                 .presentationDetents([.medium])
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
+        .onAppear {
+            if viewModel == nil {
+                viewModel = WhitelistViewModel(callBlockingService: callBlockingService)
+            }
+        }
     }
     
     // MARK: - View Components
@@ -104,7 +118,7 @@ struct WhitelistView: View {
                     contactImage: nil,
                     addedDate: contact.addedAt,
                     callsAllowed: contact.callsAllowed,
-                    onRemove: { removeFromWhitelist(contact) },
+                    onRemove: { viewModel?.removeFromWhitelist(contact) },
                     onViewDetails: { }
                 )
                 
@@ -116,48 +130,6 @@ struct WhitelistView: View {
         .background(Color.grootSnow)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .grootAppear(delay: 0.3)
-    }
-    
-    // MARK: - Actions
-    
-    private func removeFromWhitelist(_ contact: WhitelistContact) {
-        do {
-            try callBlockingService.removeFromWhitelist(contact.phoneNumber)
-            toastMessage = "Contact removed"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to remove"
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func addContactToWhitelist(_ contact: ContactInfo) {
-        guard let phoneNumber = contact.primaryPhoneNumber else { return }
-        
-        do {
-            try callBlockingService.addToWhitelist(
-                name: contact.fullName,
-                phoneNumber: phoneNumber,
-                contactIdentifier: contact.id
-            )
-            toastMessage = "Contact added!"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = error.localizedDescription
-            showToast = true
-            GrootHaptics.error()
-        }
     }
 }
 

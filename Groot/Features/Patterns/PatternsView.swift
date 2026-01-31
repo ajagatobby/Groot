@@ -11,37 +11,20 @@ import SwiftData
 // MARK: - Patterns View
 
 struct PatternsView: View {
+    
+    // MARK: - Environment
+    
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
     
     @Query(sort: \BlockPattern.createdAt, order: .reverse)
     private var patterns: [BlockPattern]
     
-    @State private var showAddSheet = false
-    @State private var showToast = false
-    @State private var toastMessage = ""
-    @State private var searchText = ""
+    // MARK: - ViewModel
     
-    // MARK: - Computed Properties
-    
-    private var filteredPatterns: [BlockPattern] {
-        if searchText.isEmpty {
-            return patterns
-        }
-        return patterns.filter {
-            $0.pattern.localizedCaseInsensitiveContains(searchText) ||
-            $0.patternDescription.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-    
-    private var enabledCount: Int {
-        patterns.filter { $0.isEnabled }.count
-    }
-    
-    private var totalMatches: Int {
-        patterns.reduce(0) { $0 + $1.matchCount }
-    }
+    @State private var viewModel: PatternsViewModel?
     
     // MARK: - Body
     
@@ -56,11 +39,11 @@ struct PatternsView: View {
                     
                     if patterns.isEmpty {
                         GrootEmptyState.noPatterns {
-                            showAddSheet = true
+                            viewModel?.openAddSheet()
                         }
                         .grootAppear(delay: 0)
                     } else if filteredPatterns.isEmpty {
-                        GrootEmptyState.searchNoResults(query: searchText)
+                        GrootEmptyState.searchNoResults(query: viewModel?.searchText ?? "")
                             .grootAppear(delay: 0)
                     } else {
                         patternsListSection
@@ -89,16 +72,40 @@ struct PatternsView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     GrootIconButton("plus", variant: .primary, size: .small) {
-                        showAddSheet = true
+                        viewModel?.openAddSheet()
                     }
                 }
             }
         }
-        .sheet(isPresented: $showAddSheet) {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showAddSheet ?? false },
+            set: { viewModel?.showAddSheet = $0 }
+        )) {
             AddPatternSheet()
                 .presentationDetents([.medium, .large])
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
+        .onAppear {
+            if viewModel == nil {
+                viewModel = PatternsViewModel(callBlockingService: callBlockingService)
+            }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var filteredPatterns: [BlockPattern] {
+        viewModel?.filteredPatterns(from: patterns) ?? patterns
+    }
+    
+    private var availableSuggestions: [(pattern: String, description: String)] {
+        viewModel?.availableSuggestions(from: patterns) ?? []
     }
     
     // MARK: - View Components
@@ -114,14 +121,14 @@ struct PatternsView: View {
             
             PatternStatCard(
                 icon: "checkmark.circle.fill",
-                value: "\(enabledCount)",
+                value: "\(viewModel?.enabledCount(from: patterns) ?? 0)",
                 label: "active",
                 color: .grootShield
             )
             
             PatternStatCard(
                 icon: "phone.down.fill",
-                value: "\(totalMatches)",
+                value: "\(viewModel?.totalMatches(from: patterns) ?? 0)",
                 label: "blocked",
                 color: .grootFlame
             )
@@ -130,8 +137,14 @@ struct PatternsView: View {
     }
     
     private var searchSection: some View {
-        GrootSearchField("search patterns", text: $searchText)
-            .grootAppear(delay: 0.1)
+        GrootSearchField(
+            "search patterns",
+            text: Binding(
+                get: { viewModel?.searchText ?? "" },
+                set: { viewModel?.searchText = $0 }
+            )
+        )
+        .grootAppear(delay: 0.1)
     }
     
     private var patternsListSection: some View {
@@ -149,8 +162,8 @@ struct PatternsView: View {
                 ForEach(filteredPatterns) { pattern in
                     PatternRow(
                         pattern: pattern,
-                        onToggle: { togglePattern(pattern) },
-                        onDelete: { deletePattern(pattern) }
+                        onToggle: { viewModel?.togglePattern(pattern) },
+                        onDelete: { viewModel?.deletePattern(pattern) }
                     )
                     
                     if pattern.id != filteredPatterns.last?.id {
@@ -176,8 +189,8 @@ struct PatternsView: View {
                     SuggestedPatternRow(
                         pattern: suggestion.pattern,
                         description: suggestion.description,
-                        isAdded: isPatternAdded(suggestion.pattern),
-                        onAdd: { addSuggestedPattern(suggestion) }
+                        isAdded: viewModel?.isPatternAdded(suggestion.pattern, in: patterns) ?? false,
+                        onAdd: { viewModel?.addSuggestedPattern(suggestion) }
                     )
                     
                     if index < suggestions.count - 1 {
@@ -199,69 +212,6 @@ struct PatternsView: View {
             color: .grootSun
         )
         .grootAppear(delay: 0.5)
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var availableSuggestions: [(pattern: String, description: String)] {
-        BlockPattern.commonPatterns.filter { suggestion in
-            !patterns.contains { $0.pattern == suggestion.pattern }
-        }
-    }
-    
-    private func isPatternAdded(_ pattern: String) -> Bool {
-        patterns.contains { $0.pattern == pattern }
-    }
-    
-    // MARK: - Actions
-    
-    private func togglePattern(_ pattern: BlockPattern) {
-        do {
-            try callBlockingService.togglePattern(pattern.pattern)
-            GrootHaptics.selection()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to toggle pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func deletePattern(_ pattern: BlockPattern) {
-        do {
-            try callBlockingService.removePattern(pattern.pattern)
-            toastMessage = "Pattern removed"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to remove pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func addSuggestedPattern(_ suggestion: (pattern: String, description: String)) {
-        do {
-            try callBlockingService.addPattern(suggestion.pattern, description: suggestion.description)
-            toastMessage = "Pattern added!"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to add pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
     }
 }
 
@@ -352,37 +302,28 @@ struct SuggestedPatternRow: View {
 // MARK: - Patterns Tab View (For Main Tab Bar)
 
 struct PatternsTabView: View {
-    @Environment(\.modelContext) private var modelContext
+    
+    // MARK: - Environment
+    
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
     
     @Query(sort: \BlockPattern.createdAt, order: .reverse)
     private var patterns: [BlockPattern]
     
-    @AppStorage("hideSuggestedPatterns") private var hideSuggestedPatterns = false
+    // MARK: - ViewModel
     
-    @State private var showAddSheet = false
-    @State private var showToast = false
-    @State private var toastMessage = ""
-    @State private var searchText = ""
+    @State private var viewModel: PatternsViewModel?
     
     // MARK: - Computed Properties
     
     private var filteredPatterns: [BlockPattern] {
-        if searchText.isEmpty {
-            return patterns
-        }
-        return patterns.filter {
-            $0.pattern.localizedCaseInsensitiveContains(searchText) ||
-            $0.patternDescription.localizedCaseInsensitiveContains(searchText)
-        }
+        viewModel?.filteredPatterns(from: patterns) ?? patterns
     }
     
-    private var enabledCount: Int {
-        patterns.filter { $0.isEnabled }.count
-    }
-    
-    private var totalMatches: Int {
-        patterns.reduce(0) { $0 + $1.matchCount }
+    private var availableSuggestions: [(pattern: String, description: String)] {
+        viewModel?.availableSuggestions(from: patterns) ?? []
     }
     
     // MARK: - Body
@@ -398,21 +339,21 @@ struct PatternsTabView: View {
                     
                     if patterns.isEmpty {
                         GrootEmptyState.noPatterns {
-                            showAddSheet = true
+                            viewModel?.openAddSheet()
                         }
                         .grootAppear(delay: 0)
                     } else if filteredPatterns.isEmpty {
-                        GrootEmptyState.searchNoResults(query: searchText)
+                        GrootEmptyState.searchNoResults(query: viewModel?.searchText ?? "")
                             .grootAppear(delay: 0)
                     } else {
                         patternsListSection
                     }
                     
-                    if !hideSuggestedPatterns && !availableSuggestions.isEmpty {
+                    if viewModel?.hideSuggestedPatterns != true && !availableSuggestions.isEmpty {
                         suggestedPatternsSection
                     }
                     
-                    if hideSuggestedPatterns && !availableSuggestions.isEmpty {
+                    if viewModel?.hideSuggestedPatterns == true && !availableSuggestions.isEmpty {
                         showSuggestionsButton
                     }
                     
@@ -433,16 +374,30 @@ struct PatternsTabView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     GrootIconButton("plus", variant: .primary, size: .small) {
-                        showAddSheet = true
+                        viewModel?.openAddSheet()
                     }
                 }
             }
         }
-        .sheet(isPresented: $showAddSheet) {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showAddSheet ?? false },
+            set: { viewModel?.showAddSheet = $0 }
+        )) {
             AddPatternSheet()
                 .presentationDetents([.medium, .large])
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
+        .onAppear {
+            if viewModel == nil {
+                viewModel = PatternsViewModel(callBlockingService: callBlockingService)
+            }
+        }
     }
     
     // MARK: - View Components
@@ -458,14 +413,14 @@ struct PatternsTabView: View {
             
             PatternStatCard(
                 icon: "checkmark.circle.fill",
-                value: "\(enabledCount)",
+                value: "\(viewModel?.enabledCount(from: patterns) ?? 0)",
                 label: "active",
                 color: .grootShield
             )
             
             PatternStatCard(
                 icon: "phone.down.fill",
-                value: "\(totalMatches)",
+                value: "\(viewModel?.totalMatches(from: patterns) ?? 0)",
                 label: "blocked",
                 color: .grootFlame
             )
@@ -474,8 +429,14 @@ struct PatternsTabView: View {
     }
     
     private var searchSection: some View {
-        GrootSearchField("search patterns", text: $searchText)
-            .grootAppear(delay: 0.1)
+        GrootSearchField(
+            "search patterns",
+            text: Binding(
+                get: { viewModel?.searchText ?? "" },
+                set: { viewModel?.searchText = $0 }
+            )
+        )
+        .grootAppear(delay: 0.1)
     }
     
     private var patternsListSection: some View {
@@ -493,8 +454,8 @@ struct PatternsTabView: View {
                 ForEach(filteredPatterns) { pattern in
                     PatternRow(
                         pattern: pattern,
-                        onToggle: { togglePattern(pattern) },
-                        onDelete: { deletePattern(pattern) }
+                        onToggle: { viewModel?.togglePattern(pattern) },
+                        onDelete: { viewModel?.deletePattern(pattern) }
                     )
                     
                     if pattern.id != filteredPatterns.last?.id {
@@ -514,10 +475,7 @@ struct PatternsTabView: View {
                 GrootText("suggested patterns", style: .heading)
                 Spacer()
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        hideSuggestedPatterns = true
-                    }
-                    GrootHaptics.selection()
+                    viewModel?.hideSuggestions()
                 } label: {
                     Text("hide")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -533,8 +491,8 @@ struct PatternsTabView: View {
                     SuggestedPatternRow(
                         pattern: suggestion.pattern,
                         description: suggestion.description,
-                        isAdded: isPatternAdded(suggestion.pattern),
-                        onAdd: { addSuggestedPattern(suggestion) }
+                        isAdded: viewModel?.isPatternAdded(suggestion.pattern, in: patterns) ?? false,
+                        onAdd: { viewModel?.addSuggestedPattern(suggestion) }
                     )
                     
                     if index < suggestions.count - 1 {
@@ -550,10 +508,7 @@ struct PatternsTabView: View {
     
     private var showSuggestionsButton: some View {
         Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                hideSuggestedPatterns = false
-            }
-            GrootHaptics.selection()
+            viewModel?.showSuggestions()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
@@ -578,69 +533,6 @@ struct PatternsTabView: View {
             color: .grootSun
         )
         .grootAppear(delay: 0.5)
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var availableSuggestions: [(pattern: String, description: String)] {
-        BlockPattern.commonPatterns.filter { suggestion in
-            !patterns.contains { $0.pattern == suggestion.pattern }
-        }
-    }
-    
-    private func isPatternAdded(_ pattern: String) -> Bool {
-        patterns.contains { $0.pattern == pattern }
-    }
-    
-    // MARK: - Actions
-    
-    private func togglePattern(_ pattern: BlockPattern) {
-        do {
-            try callBlockingService.togglePattern(pattern.pattern)
-            GrootHaptics.selection()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to toggle pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func deletePattern(_ pattern: BlockPattern) {
-        do {
-            try callBlockingService.removePattern(pattern.pattern)
-            toastMessage = "Pattern removed"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to remove pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func addSuggestedPattern(_ suggestion: (pattern: String, description: String)) {
-        do {
-            try callBlockingService.addPattern(suggestion.pattern, description: suggestion.description)
-            toastMessage = "Pattern added!"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to add pattern"
-            showToast = true
-            GrootHaptics.error()
-        }
     }
 }
 

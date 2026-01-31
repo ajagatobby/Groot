@@ -7,37 +7,23 @@
 
 import SwiftUI
 import SwiftData
-import UIKit
 
 // MARK: - Countries View
 
 struct CountriesView: View {
-    @Environment(\.modelContext) private var modelContext
+    
+    // MARK: - Environment
+    
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
     
     @Query(sort: \BlockedCountry.blockedAt, order: .reverse)
     private var blockedCountries: [BlockedCountry]
     
-    @State private var searchText = ""
-    @State private var showToast = false
-    @State private var toastMessage = ""
+    // MARK: - ViewModel
     
-    // MARK: - Computed Properties
-    
-    private var filteredCountriesByRegion: [Country.Region: [Country]] {
-        let countries = searchText.isEmpty
-            ? CountryDataService.shared.allCountries
-            : CountryDataService.shared.search(searchText)
-        return Dictionary(grouping: countries) { $0.region }
-    }
-    
-    private var blockedCountryCodes: Set<String> {
-        Set(blockedCountries.map { $0.countryCode })
-    }
-    
-    private func blockedCountry(for code: String) -> BlockedCountry? {
-        blockedCountries.first { $0.countryCode == code }
-    }
+    @State private var viewModel: CountriesViewModel?
     
     // MARK: - Body
     
@@ -46,7 +32,10 @@ struct CountriesView: View {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     CountrySearchHeader(
-                        searchText: $searchText,
+                        searchText: Binding(
+                            get: { viewModel?.searchText ?? "" },
+                            set: { viewModel?.searchText = $0 }
+                        ),
                         blockedCount: blockedCountries.count
                     )
                     .grootAppear(delay: 0)
@@ -70,7 +59,18 @@ struct CountriesView: View {
                 }
             }
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
+        .onAppear {
+            if viewModel == nil {
+                viewModel = CountriesViewModel(callBlockingService: callBlockingService)
+            }
+        }
     }
     
     // MARK: - View Components
@@ -91,7 +91,7 @@ struct CountriesView: View {
                     code: blocked.countryCode,
                     blockedCalls: blocked.callsBlocked,
                     blockedSince: blocked.blockedAt,
-                    onUnblock: { unblockCountry(blocked) }
+                    onUnblock: { viewModel?.unblockCountry(blocked) }
                 )
             }
         }
@@ -100,82 +100,22 @@ struct CountriesView: View {
     
     @ViewBuilder
     private var countriesByRegionSection: some View {
+        let filteredByRegion = viewModel?.filteredCountriesByRegion ?? [:]
+        
         ForEach(Country.Region.allCases, id: \.self) { region in
-            if let countries = filteredCountriesByRegion[region], !countries.isEmpty {
+            if let countries = filteredByRegion[region], !countries.isEmpty {
                 CountryRegionSection(
                     region: region.rawValue,
-                    countries: countries.map { country in
-                        let blocked = blockedCountry(for: country.callingCode)
-                        return CountryRegionSection.CountryItem(
-                            flag: country.flag,
-                            name: country.name,
-                            code: country.callingCode,
-                            isBlocked: blockedCountryCodes.contains(country.callingCode),
-                            blockedCalls: blocked?.callsBlocked ?? 0
-                        )
-                    },
+                    countries: viewModel?.mapToCountryItems(
+                        countries: countries,
+                        blockedCountries: blockedCountries
+                    ) ?? [],
                     onToggle: { item in
-                        toggleCountryBlocking(item, country: countries.first { $0.callingCode == item.code })
+                        viewModel?.toggleCountryBlocking(item, from: countries)
                     }
                 )
                 .grootAppear(delay: 0.3)
             }
-        }
-    }
-    
-    // MARK: - Actions
-    
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    }
-    
-    private func toggleCountryBlocking(_ item: CountryRegionSection.CountryItem, country: Country?) {
-        guard let country = country else { return }
-        
-        if item.isBlocked {
-            unblockCountryCode(item.code)
-        } else {
-            blockCountry(country)
-        }
-    }
-    
-    private func blockCountry(_ country: Country) {
-        dismissKeyboard()
-        
-        do {
-            try callBlockingService.blockCountry(country)
-            toastMessage = "\(country.flag) \(country.name) blocked"
-            showToast = true
-            GrootHaptics.blockConfirmed()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = error.localizedDescription
-            showToast = true
-            GrootHaptics.error()
-        }
-    }
-    
-    private func unblockCountry(_ blocked: BlockedCountry) {
-        unblockCountryCode(blocked.countryCode)
-    }
-    
-    private func unblockCountryCode(_ code: String) {
-        do {
-            try callBlockingService.unblockCountry(code)
-            toastMessage = "Country unblocked"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = error.localizedDescription
-            showToast = true
-            GrootHaptics.error()
         }
     }
 }

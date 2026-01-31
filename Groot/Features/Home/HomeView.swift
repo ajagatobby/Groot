@@ -11,41 +11,21 @@ import SwiftData
 // MARK: - Home View
 
 struct HomeView: View {
-    @Environment(\.modelContext) private var modelContext
+    
+    // MARK: - Environment
+    
     @Environment(\.callBlockingService) private var callBlockingService
+    
+    // MARK: - Data
     
     @Query(sort: \BlockedNumber.blockedAt, order: .reverse)
     private var blockedNumbers: [BlockedNumber]
     
     @Query private var blockedCountries: [BlockedCountry]
     
-    @State private var showBlockSheet = false
-    @State private var showToast = false
-    @State private var toastMessage = ""
+    // MARK: - ViewModel
     
-    // MARK: - Computed Properties
-    
-    private var totalBlocked: Int { blockedNumbers.count }
-    
-    private var blockedToday: Int {
-        let calendar = Calendar.current
-        return blockedNumbers.filter { calendar.isDateInToday($0.blockedAt) }.count
-    }
-    
-    private var blockedThisWeek: Int {
-        let calendar = Calendar.current
-        let weekAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        return blockedNumbers.filter { $0.blockedAt >= weekAgo }.count
-    }
-    
-    private var topBlockedCountry: String? {
-        guard !blockedCountries.isEmpty else { return nil }
-        return blockedCountries.max(by: { $0.callsBlocked < $1.callsBlocked })?.flag
-    }
-    
-    private var recentBlocks: [BlockedNumber] {
-        Array(blockedNumbers.prefix(5))
-    }
+    @State private var viewModel: HomeViewModel?
     
     // MARK: - Body
     
@@ -56,16 +36,16 @@ struct HomeView: View {
                     extensionStatusBanner
                     
                     BlockedStatsCard(
-                        totalBlocked: totalBlocked,
-                        blockedToday: blockedToday,
-                        blockedThisWeek: blockedThisWeek,
-                        topBlockedCountry: topBlockedCountry
+                        totalBlocked: blockedNumbers.count,
+                        blockedToday: viewModel?.blockedToday(from: blockedNumbers) ?? 0,
+                        blockedThisWeek: viewModel?.blockedThisWeek(from: blockedNumbers) ?? 0,
+                        topBlockedCountry: viewModel?.topBlockedCountry(from: blockedCountries)
                     )
                     .grootAppear(delay: 0)
                     
                     if blockedNumbers.isEmpty {
                         GrootEmptyState.noBlockedNumbers {
-                            showBlockSheet = true
+                            viewModel?.openBlockSheet()
                         }
                         .grootAppear(delay: 0.1)
                     } else {
@@ -95,29 +75,43 @@ struct HomeView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     GrootIconButton("plus", variant: .primary, size: .small) {
-                        showBlockSheet = true
+                        viewModel?.openBlockSheet()
                     }
                 }
             }
         }
-        .sheet(isPresented: $showBlockSheet) {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showBlockSheet ?? false },
+            set: { viewModel?.showBlockSheet = $0 }
+        )) {
             AddBlockNumberSheet()
                 .presentationDetents([.medium])
         }
-        .grootToast(isPresented: $showToast, message: toastMessage)
+        .grootToast(
+            isPresented: Binding(
+                get: { viewModel?.showToast ?? false },
+                set: { viewModel?.showToast = $0 }
+            ),
+            message: viewModel?.toastMessage ?? ""
+        )
+        .onAppear {
+            if viewModel == nil {
+                viewModel = HomeViewModel(callBlockingService: callBlockingService)
+            }
+        }
     }
     
     // MARK: - View Components
     
     @ViewBuilder
     private var extensionStatusBanner: some View {
-        if !callBlockingService.extensionStatus.isEnabled && callBlockingService.extensionStatus != .unknown {
+        if viewModel?.isExtensionDisabled == true {
             GrootBanner(
                 "Enable call blocking in Settings to protect your phone",
                 variant: .warning,
                 icon: "exclamationmark.triangle.fill",
                 action: .init(title: "Enable", action: {
-                    callBlockingService.openCallBlockingSettings()
+                    viewModel?.openCallBlockingSettings()
                 })
             )
             .grootAppear(delay: 0)
@@ -126,6 +120,8 @@ struct HomeView: View {
     
     @ViewBuilder
     private var recentBlocksSection: some View {
+        let recentBlocks = viewModel?.recentBlocks(from: blockedNumbers) ?? []
+        
         HStack {
             GrootText("recent blocks", style: .heading)
             Spacer()
@@ -145,7 +141,7 @@ struct HomeView: View {
             ForEach(recentBlocks) { blocked in
                 BlockedNumberRow(
                     blockedNumber: blocked,
-                    onUnblock: { unblockNumber(blocked) },
+                    onUnblock: { viewModel?.unblockNumber(blocked) },
                     onViewDetails: { }
                 )
                 
@@ -157,25 +153,6 @@ struct HomeView: View {
         .background(Color.grootSnow)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .grootAppear(delay: 0.2)
-    }
-    
-    // MARK: - Actions
-    
-    private func unblockNumber(_ blocked: BlockedNumber) {
-        do {
-            try callBlockingService.unblockNumber(blocked.phoneNumber)
-            toastMessage = "Number unblocked!"
-            showToast = true
-            GrootHaptics.success()
-            
-            Task {
-                try? await callBlockingService.reloadCallDirectory()
-            }
-        } catch {
-            toastMessage = "Failed to unblock"
-            showToast = true
-            GrootHaptics.error()
-        }
     }
 }
 
