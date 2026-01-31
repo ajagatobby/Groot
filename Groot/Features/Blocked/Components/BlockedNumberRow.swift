@@ -7,6 +7,16 @@
 
 import SwiftUI
 
+// MARK: - Cached Formatters (Performance Optimization)
+
+private enum FormatterCache {
+    static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+}
+
 // MARK: - Blocked Number Row
 
 struct BlockedNumberRow: View {
@@ -106,9 +116,7 @@ struct BlockedNumberRow: View {
     }
     
     private var timeAgo: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: blockedNumber.blockedAt, relativeTo: Date())
+        FormatterCache.relativeDateFormatter.localizedString(for: blockedNumber.blockedAt, relativeTo: Date())
     }
 }
 

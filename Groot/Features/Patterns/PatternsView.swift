@@ -48,7 +48,7 @@ struct PatternsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     if !patterns.isEmpty {
                         statsSection
                         searchSection
@@ -146,14 +146,14 @@ struct PatternsView: View {
             .grootAppear(delay: 0.1)
             
             VStack(spacing: 0) {
-                ForEach(Array(filteredPatterns.enumerated()), id: \.element.id) { index, pattern in
+                ForEach(filteredPatterns) { pattern in
                     PatternRow(
                         pattern: pattern,
                         onToggle: { togglePattern(pattern) },
                         onDelete: { deletePattern(pattern) }
                     )
                     
-                    if index < filteredPatterns.count - 1 {
+                    if pattern.id != filteredPatterns.last?.id {
                         Divider().padding(.leading, 70)
                     }
                 }
@@ -170,7 +170,9 @@ struct PatternsView: View {
                 .grootAppear(delay: 0.3)
             
             VStack(spacing: 0) {
-                ForEach(Array(availableSuggestions.enumerated()), id: \.element.pattern) { index, suggestion in
+                let suggestions = availableSuggestions
+                ForEach(suggestions.indices, id: \.self) { index in
+                    let suggestion = suggestions[index]
                     SuggestedPatternRow(
                         pattern: suggestion.pattern,
                         description: suggestion.description,
@@ -178,7 +180,7 @@ struct PatternsView: View {
                         onAdd: { addSuggestedPattern(suggestion) }
                     )
                     
-                    if index < availableSuggestions.count - 1 {
+                    if index < suggestions.count - 1 {
                         Divider().padding(.leading, 70)
                     }
                 }
@@ -388,7 +390,7 @@ struct PatternsTabView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     if !patterns.isEmpty {
                         statsSection
                         searchSection
@@ -488,14 +490,14 @@ struct PatternsTabView: View {
             .grootAppear(delay: 0.1)
             
             VStack(spacing: 0) {
-                ForEach(Array(filteredPatterns.enumerated()), id: \.element.id) { index, pattern in
+                ForEach(filteredPatterns) { pattern in
                     PatternRow(
                         pattern: pattern,
                         onToggle: { togglePattern(pattern) },
                         onDelete: { deletePattern(pattern) }
                     )
                     
-                    if index < filteredPatterns.count - 1 {
+                    if pattern.id != filteredPatterns.last?.id {
                         Divider().padding(.leading, 70)
                     }
                 }
@@ -525,7 +527,9 @@ struct PatternsTabView: View {
             .grootAppear(delay: 0.3)
             
             VStack(spacing: 0) {
-                ForEach(Array(availableSuggestions.enumerated()), id: \.element.pattern) { index, suggestion in
+                let suggestions = availableSuggestions
+                ForEach(suggestions.indices, id: \.self) { index in
+                    let suggestion = suggestions[index]
                     SuggestedPatternRow(
                         pattern: suggestion.pattern,
                         description: suggestion.description,
@@ -533,7 +537,7 @@ struct PatternsTabView: View {
                         onAdd: { addSuggestedPattern(suggestion) }
                     )
                     
-                    if index < availableSuggestions.count - 1 {
+                    if index < suggestions.count - 1 {
                         Divider().padding(.leading, 70)
                     }
                 }

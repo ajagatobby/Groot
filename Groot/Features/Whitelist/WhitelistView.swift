@@ -33,7 +33,7 @@ struct WhitelistView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     WhitelistStatsRow(
                         totalContacts: whitelistContacts.count,
                         callsAllowed: totalCallsAllowed
@@ -97,7 +97,7 @@ struct WhitelistView: View {
         .grootAppear(delay: 0.2)
         
         VStack(spacing: 0) {
-            ForEach(Array(whitelistContacts.enumerated()), id: \.element.id) { index, contact in
+            ForEach(whitelistContacts) { contact in
                 WhitelistContactRow(
                     name: contact.name,
                     phoneNumber: PhoneNumberService.shared.formatForDisplay(contact.phoneNumber),
@@ -108,7 +108,7 @@ struct WhitelistView: View {
                     onViewDetails: { }
                 )
                 
-                if index < whitelistContacts.count - 1 {
+                if contact.id != whitelistContacts.last?.id {
                     Divider().padding(.leading, 78)
                 }
             }

@@ -199,7 +199,7 @@ struct CountryRegionSection: View {
                 .padding(.horizontal, 16)
             
             VStack(spacing: 0) {
-                ForEach(Array(countries.enumerated()), id: \.element.id) { index, country in
+                ForEach(countries) { country in
                     CountryPickerRow(
                         flag: country.flag,
                         name: country.name,
@@ -210,7 +210,7 @@ struct CountryRegionSection: View {
                         onToggle(country)
                     }
                     
-                    if index < countries.count - 1 {
+                    if country.id != countries.last?.id {
                         Divider()
                             .padding(.leading, 62)
                     }

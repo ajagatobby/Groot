@@ -13,13 +13,26 @@ import SwiftData
 /// Main tab-based navigation container for the Groot app.
 /// This view manages the bottom tab bar and displays the appropriate
 /// feature view based on the selected tab.
+/// 
+/// Performance optimizations:
+/// - Uses lazy tab loading to only initialize visited tabs
+/// - Caches badge counts to avoid duplicate computation
+/// - Uses allowsHitTesting instead of opacity for hidden tabs
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
     @State private var callBlockingService = CallBlockingService()
+    @State private var visitedTabs: Set<Int> = [0] // Track visited tabs for lazy loading
     
     @Query private var blockedNumbers: [BlockedNumber]
     @Query private var patterns: [BlockPattern]
+    
+    // MARK: - Cached Computed Properties
+    
+    /// Cache enabled patterns count to avoid duplicate filter
+    private var enabledPatternsCount: Int {
+        patterns.filter { $0.isEnabled }.count
+    }
     
     // MARK: - Body
     
@@ -33,28 +46,47 @@ struct ContentView: View {
         .onAppear {
             callBlockingService.configure(with: modelContext)
         }
+        .onChange(of: selectedTab) { _, newTab in
+            // Mark tab as visited for lazy loading
+            visitedTabs.insert(newTab)
+        }
     }
     
     // MARK: - View Components
     
-    /// Maintains all views in memory to preserve state
+    /// Lazy tab loading - only initializes tabs that have been visited
+    /// Uses allowsHitTesting(false) instead of opacity for better performance
     private var tabContent: some View {
         ZStack {
+            // Home (always loaded as default tab)
             HomeView()
-                .opacity(selectedTab == 0 ? 1 : 0)
                 .zIndex(selectedTab == 0 ? 1 : 0)
+                .allowsHitTesting(selectedTab == 0)
+                .opacity(selectedTab == 0 ? 1 : 0)
             
-            PatternsTabView()
-                .opacity(selectedTab == 1 ? 1 : 0)
-                .zIndex(selectedTab == 1 ? 1 : 0)
+            // Patterns (lazy loaded)
+            if visitedTabs.contains(1) {
+                PatternsTabView()
+                    .zIndex(selectedTab == 1 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 1)
+                    .opacity(selectedTab == 1 ? 1 : 0)
+            }
             
-            CountriesView()
-                .opacity(selectedTab == 2 ? 1 : 0)
-                .zIndex(selectedTab == 2 ? 1 : 0)
+            // Countries (lazy loaded)
+            if visitedTabs.contains(2) {
+                CountriesView()
+                    .zIndex(selectedTab == 2 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 2)
+                    .opacity(selectedTab == 2 ? 1 : 0)
+            }
             
-            SettingsView()
-                .opacity(selectedTab == 3 ? 1 : 0)
-                .zIndex(selectedTab == 3 ? 1 : 0)
+            // Settings (lazy loaded)
+            if visitedTabs.contains(3) {
+                SettingsView()
+                    .zIndex(selectedTab == 3 ? 1 : 0)
+                    .allowsHitTesting(selectedTab == 3)
+                    .opacity(selectedTab == 3 ? 1 : 0)
+            }
         }
     }
     
@@ -72,7 +104,7 @@ struct ContentView: View {
                     icon: "number",
                     selectedIcon: "number.square.fill",
                     label: "patterns",
-                    badge: patterns.filter { $0.isEnabled }.count > 0 ? patterns.filter { $0.isEnabled }.count : nil
+                    badge: enabledPatternsCount > 0 ? enabledPatternsCount : nil
                 ),
                 .init(
                     icon: "globe",

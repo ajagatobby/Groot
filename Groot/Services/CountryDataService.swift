@@ -51,69 +51,91 @@ struct Country: Identifiable, Hashable {
 }
 
 /// Service providing country data for call blocking
-@Observable
-final class CountryDataService {
+/// Performance optimized with cached sorted/grouped results
+final class CountryDataService: @unchecked Sendable {
     
     // MARK: - Singleton
     
     static let shared = CountryDataService()
     
-    private init() {}
+    // MARK: - Cached Data (computed once at init)
     
-    // MARK: - Data
-    
-    /// All countries sorted by name
-    var allCountries: [Country] {
-        countries.sorted { $0.name < $1.name }
-    }
+    /// All countries sorted by name (cached)
+    let allCountries: [Country]
     
     /// Total country count
-    var countryCount: Int {
-        countries.count
+    let countryCount: Int
+    
+    /// Countries grouped by region (cached)
+    let countriesByRegion: [Country.Region: [Country]]
+    
+    /// Lookup dictionaries for O(1) access
+    private let countryByISOCode: [String: Country]
+    private let countryByCallingCode: [String: Country]
+    
+    /// User's current region country (cached)
+    let currentRegionCountry: Country?
+    
+    private init() {
+        // Pre-sort countries once
+        let sorted = Self.rawCountries.sorted { $0.name < $1.name }
+        self.allCountries = sorted
+        self.countryCount = sorted.count
+        
+        // Pre-group by region once
+        self.countriesByRegion = Dictionary(grouping: sorted) { $0.region }
+        
+        // Build lookup dictionaries for O(1) access
+        var isoLookup: [String: Country] = [:]
+        var callingLookup: [String: Country] = [:]
+        for country in sorted {
+            isoLookup[country.isoCode.uppercased()] = country
+            // For calling codes, store without duplicates (first match wins)
+            let digits = country.callingCode.filter { $0.isNumber }
+            if callingLookup[digits] == nil {
+                callingLookup[digits] = country
+            }
+        }
+        self.countryByISOCode = isoLookup
+        self.countryByCallingCode = callingLookup
+        
+        // Cache current region country
+        if let regionCode = Locale.current.region?.identifier {
+            self.currentRegionCountry = isoLookup[regionCode.uppercased()]
+        } else {
+            self.currentRegionCountry = nil
+        }
     }
     
-    /// Countries grouped by region
-    var countriesByRegion: [Country.Region: [Country]] {
-        Dictionary(grouping: countries) { $0.region }
-            .mapValues { $0.sorted { $0.name < $1.name } }
-    }
+    // MARK: - Search (optimized)
     
     /// Search countries by name or code
+    /// Uses pre-sorted array, no additional sorting needed
     func search(_ query: String) -> [Country] {
         guard !query.isEmpty else { return allCountries }
         
         let lowercased = query.lowercased()
-        return countries.filter {
+        return allCountries.filter {
             $0.name.lowercased().contains(lowercased) ||
             $0.isoCode.lowercased().contains(lowercased) ||
             $0.callingCode.contains(query)
-        }.sorted { $0.name < $1.name }
+        }
     }
     
-    /// Find country by ISO code
+    /// Find country by ISO code - O(1) lookup
     func country(forISOCode isoCode: String) -> Country? {
-        countries.first { $0.isoCode.uppercased() == isoCode.uppercased() }
+        countryByISOCode[isoCode.uppercased()]
     }
     
-    /// Find country by calling code
+    /// Find country by calling code - O(1) lookup
     func country(forCallingCode code: String) -> Country? {
         let digits = code.filter { $0.isNumber }
-        return countries.first {
-            $0.callingCode.filter { $0.isNumber } == digits
-        }
-    }
-    
-    /// Get the user's current region country (based on locale)
-    var currentRegionCountry: Country? {
-        if let regionCode = Locale.current.region?.identifier {
-            return country(forISOCode: regionCode)
-        }
-        return nil
+        return countryByCallingCode[digits]
     }
     
     // MARK: - Complete Country Database (All 195+ Countries)
     
-    private let countries: [Country] = [
+    private static let rawCountries: [Country] = [
         
         // ══════════════════════════════════════════════════════════════════
         // NORTH AMERICA

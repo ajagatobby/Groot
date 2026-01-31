@@ -52,7 +52,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     extensionStatusBanner
                     
                     BlockedStatsCard(
@@ -142,14 +142,14 @@ struct HomeView: View {
         .grootAppear(delay: 0.1)
         
         VStack(spacing: 0) {
-            ForEach(Array(recentBlocks.enumerated()), id: \.element.id) { index, blocked in
+            ForEach(recentBlocks) { blocked in
                 BlockedNumberRow(
                     blockedNumber: blocked,
                     onUnblock: { unblockNumber(blocked) },
                     onViewDetails: { }
                 )
                 
-                if index < recentBlocks.count - 1 {
+                if blocked.id != recentBlocks.last?.id {
                     Divider().padding(.leading, 78)
                 }
             }

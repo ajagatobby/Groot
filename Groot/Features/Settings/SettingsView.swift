@@ -29,7 +29,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     callDirectorySection
                     blockingSection
                     preferencesSection

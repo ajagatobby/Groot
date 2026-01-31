@@ -55,7 +55,7 @@ struct CountryCodePickerSheet: View {
     
     private var countryList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: 0, pinnedViews: []) {
                 // Current region country at top (if not searching)
                 if searchText.isEmpty, let currentCountry = countryService.currentRegionCountry {
                     VStack(alignment: .leading, spacing: 8) {
@@ -86,6 +86,7 @@ struct CountryCodePickerSheet: View {
             }
             .padding(.bottom, 40)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
     
     // MARK: - Grouped Countries
@@ -102,7 +103,7 @@ struct CountryCodePickerSheet: View {
                         .padding(.horizontal, 16)
                     
                     VStack(spacing: 0) {
-                        ForEach(Array(countries.enumerated()), id: \.element.id) { index, country in
+                        ForEach(countries) { country in
                             CountryCodeRow(
                                 country: country,
                                 isSelected: selectedCountry.id == country.id
@@ -110,7 +111,7 @@ struct CountryCodePickerSheet: View {
                                 selectCountry(country)
                             }
                             
-                            if index < countries.count - 1 {
+                            if country.id != countries.last?.id {
                                 Divider()
                                     .padding(.leading, 62)
                             }
@@ -140,7 +141,7 @@ struct CountryCodePickerSheet: View {
                     .padding(.horizontal, 16)
                 
                 VStack(spacing: 0) {
-                    ForEach(Array(results.enumerated()), id: \.element.id) { index, country in
+                    ForEach(results) { country in
                         CountryCodeRow(
                             country: country,
                             isSelected: selectedCountry.id == country.id
@@ -148,7 +149,7 @@ struct CountryCodePickerSheet: View {
                             selectCountry(country)
                         }
                         
-                        if index < results.count - 1 {
+                        if country.id != results.last?.id {
                             Divider()
                                 .padding(.leading, 62)
                         }
