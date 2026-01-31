@@ -14,13 +14,11 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.callBlockingService) private var callBlockingService
     @Query private var settings: [AppSettings]
-    @Query private var patterns: [BlockPattern]
     
     @State private var showResetAlert = false
     @State private var isSyncing = false
     @State private var showToast = false
     @State private var toastMessage = ""
-    @State private var showPatternsView = false
     
     private var appSettings: AppSettings? {
         settings.first
@@ -64,9 +62,6 @@ struct SettingsView: View {
             }
         }
         .grootToast(isPresented: $showToast, message: toastMessage)
-        .fullScreenCover(isPresented: $showPatternsView) {
-            PatternsView()
-        }
         .task {
             await callBlockingService.checkExtensionStatus()
             await callBlockingService.refreshStats()
@@ -91,18 +86,6 @@ struct SettingsView: View {
     
     private var blockingSection: some View {
         GrootListSection("blocking") {
-            GrootListItem(
-                "pattern rules",
-                subtitle: patternSubtitle,
-                icon: "number",
-                iconColor: .grootViolet,
-                accessory: patterns.isEmpty ? .badge("new") : .chevron
-            ) {
-                showPatternsView = true
-            }
-            
-            GrootListDivider()
-            
             GrootToggleRow(
                 "block unknown callers",
                 subtitle: "Automatically block numbers not in contacts",
@@ -135,17 +118,6 @@ struct SettingsView: View {
             )
         }
         .grootAppear(delay: 0.1)
-    }
-    
-    private var patternSubtitle: String {
-        let enabledCount = patterns.filter { $0.isEnabled }.count
-        if patterns.isEmpty {
-            return "Block numbers by pattern"
-        } else if enabledCount == patterns.count {
-            return "\(patterns.count) pattern\(patterns.count == 1 ? "" : "s") active"
-        } else {
-            return "\(enabledCount) of \(patterns.count) active"
-        }
     }
     
     private var preferencesSection: some View {
@@ -194,10 +166,10 @@ struct SettingsView: View {
             GrootListDivider()
             
             GrootListItem(
-                "whitelisted contacts",
-                subtitle: "\(callBlockingService.whitelistCount)",
-                icon: "checkmark.shield.fill",
-                iconColor: .grootShield,
+                "active patterns",
+                subtitle: "\(callBlockingService.patternsCount)",
+                icon: "number",
+                iconColor: .grootViolet,
                 accessory: .none
             )
             
@@ -208,16 +180,6 @@ struct SettingsView: View {
                 subtitle: "\(callBlockingService.blockedCountriesCount)",
                 icon: "globe",
                 iconColor: .grootSky,
-                accessory: .none
-            )
-            
-            GrootListDivider()
-            
-            GrootListItem(
-                "active patterns",
-                subtitle: "\(callBlockingService.patternsCount)",
-                icon: "number",
-                iconColor: .grootViolet,
                 accessory: .none
             )
         }

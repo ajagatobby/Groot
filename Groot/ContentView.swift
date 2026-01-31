@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var callBlockingService = CallBlockingService()
     
     @Query private var blockedNumbers: [BlockedNumber]
+    @Query private var patterns: [BlockPattern]
     
     // MARK: - Body
     
@@ -43,7 +44,7 @@ struct ContentView: View {
                 .opacity(selectedTab == 0 ? 1 : 0)
                 .zIndex(selectedTab == 0 ? 1 : 0)
             
-            WhitelistView()
+            PatternsTabView()
                 .opacity(selectedTab == 1 ? 1 : 0)
                 .zIndex(selectedTab == 1 ? 1 : 0)
             
@@ -68,9 +69,10 @@ struct ContentView: View {
                     badge: blockedNumbers.isEmpty ? nil : blockedNumbers.count
                 ),
                 .init(
-                    icon: "checkmark.shield",
-                    selectedIcon: "checkmark.shield.fill",
-                    label: "allowed"
+                    icon: "number",
+                    selectedIcon: "number.square.fill",
+                    label: "patterns",
+                    badge: patterns.filter { $0.isEnabled }.count > 0 ? patterns.filter { $0.isEnabled }.count : nil
                 ),
                 .init(
                     icon: "globe",
