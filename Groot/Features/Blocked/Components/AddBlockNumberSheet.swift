@@ -14,10 +14,20 @@ struct AddBlockNumberSheet: View {
     @Environment(\.callBlockingService) private var callBlockingService
     
     @State private var phoneNumber = ""
-    @State private var countryCode = "+1"
+    @State private var selectedCountry: Country
     @State private var label = ""
     @State private var isBlocking = false
     @State private var errorMessage: String?
+    @State private var showCountryPicker = false
+    
+    private let countryService = CountryDataService.shared
+    
+    init() {
+        // Initialize with user's current region or default to US
+        let initialCountry = CountryDataService.shared.currentRegionCountry 
+            ?? CountryDataService.shared.country(forISOCode: "US")!
+        _selectedCountry = State(initialValue: initialCountry)
+    }
     
     var body: some View {
         NavigationStack {
@@ -35,6 +45,11 @@ struct AddBlockNumberSheet: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showCountryPicker) {
+                CountryCodePickerSheet(selectedCountry: $selectedCountry)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
         }
     }
@@ -60,8 +75,11 @@ struct AddBlockNumberSheet: View {
         VStack(spacing: 16) {
             GrootPhoneField(
                 phoneNumber: $phoneNumber,
-                countryCode: countryCode,
-                onCountryTap: { }
+                countryCode: selectedCountry.callingCode,
+                countryFlag: selectedCountry.flag,
+                onCountryTap: {
+                    showCountryPicker = true
+                }
             )
             
             GrootTextField(
@@ -95,7 +113,7 @@ struct AddBlockNumberSheet: View {
         isBlocking = true
         errorMessage = nil
         
-        let fullNumber = countryCode + phoneNumber
+        let fullNumber = selectedCountry.callingCode + phoneNumber
         
         do {
             try callBlockingService.blockNumber(

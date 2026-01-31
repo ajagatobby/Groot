@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E64AFB862F2DC5A2003E6DAE /* PrettyUI in Frameworks */ = {isa = PBXBuildFile; productRef = E64AFB852F2DC5A2003E6DAE /* PrettyUI */; };
-		E64AFB892F2DC5C5003E6DAE /* SwiftfulHaptics in Frameworks */ = {isa = PBXBuildFile; productRef = E64AFB882F2DC5C5003E6DAE /* SwiftfulHaptics */; };
 		E64AFBAE2F2DC700003E6DAE /* CallDirectoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E64AFBA22F2DC700003E6DAE /* CallDirectoryHandler.swift */; };
 		E64AFBAF2F2DC700003E6DAE /* GrootCallDirectory.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E64AFBA02F2DC700003E6DAE /* GrootCallDirectory.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E64AFBB02F2DC700003E6DAE /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E64AFBB12F2DC700003E6DAE /* SharedModels.swift */; };
@@ -60,8 +58,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E64AFB862F2DC5A2003E6DAE /* PrettyUI in Frameworks */,
-				E64AFB892F2DC5C5003E6DAE /* SwiftfulHaptics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,8 +122,6 @@
 			);
 			name = Groot;
 			packageProductDependencies = (
-				E64AFB852F2DC5A2003E6DAE /* PrettyUI */,
-				E64AFB882F2DC5C5003E6DAE /* SwiftfulHaptics */,
 			);
 			productName = Groot;
 			productReference = E64AFB692F2DC2D4003E6DAE /* Groot.app */;
@@ -178,8 +172,6 @@
 			mainGroup = E64AFB602F2DC2D4003E6DAE;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E64AFB842F2DC5A2003E6DAE /* XCRemoteSwiftPackageReference "PrettyUI" */,
-				E64AFB872F2DC5C5003E6DAE /* XCRemoteSwiftPackageReference "SwiftfulHaptics" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E64AFB6A2F2DC2D4003E6DAE /* Products */;
@@ -519,38 +511,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		E64AFB842F2DC5A2003E6DAE /* XCRemoteSwiftPackageReference "PrettyUI" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ajagatobby/PrettyUI.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.11;
-			};
-		};
-		E64AFB872F2DC5C5003E6DAE /* XCRemoteSwiftPackageReference "SwiftfulHaptics" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/SwiftfulThinking/SwiftfulHaptics.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.3;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		E64AFB852F2DC5A2003E6DAE /* PrettyUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E64AFB842F2DC5A2003E6DAE /* XCRemoteSwiftPackageReference "PrettyUI" */;
-			productName = PrettyUI;
-		};
-		E64AFB882F2DC5C5003E6DAE /* SwiftfulHaptics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E64AFB872F2DC5C5003E6DAE /* XCRemoteSwiftPackageReference "SwiftfulHaptics" */;
-			productName = SwiftfulHaptics;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E64AFB612F2DC2D4003E6DAE /* Project object */;
 }

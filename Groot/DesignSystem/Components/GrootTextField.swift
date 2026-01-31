@@ -133,6 +133,7 @@ struct GrootPhoneField: View {
     let placeholder: String
     @Binding var phoneNumber: String
     let countryCode: String
+    let countryFlag: String
     let validation: GrootTextField.ValidationState
     let onCountryTap: () -> Void
     
@@ -140,12 +141,14 @@ struct GrootPhoneField: View {
         _ placeholder: String = "phone number",
         phoneNumber: Binding<String>,
         countryCode: String = "+1",
+        countryFlag: String = "🇺🇸",
         validation: GrootTextField.ValidationState = .none,
         onCountryTap: @escaping () -> Void
     ) {
         self.placeholder = placeholder
         self._phoneNumber = phoneNumber
         self.countryCode = countryCode
+        self.countryFlag = countryFlag
         self.validation = validation
         self.onCountryTap = onCountryTap
     }
@@ -153,7 +156,10 @@ struct GrootPhoneField: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onCountryTap) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(countryFlag)
+                        .font(.system(size: 22))
+                    
                     Text(countryCode)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.grootBark)
@@ -163,7 +169,7 @@ struct GrootPhoneField: View {
                         .foregroundStyle(Color.grootStone)
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 14)
+                .padding(.vertical, 10)
                 .background(Color.grootCloud)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(
@@ -171,6 +177,7 @@ struct GrootPhoneField: View {
                         .stroke(Color.grootMist, lineWidth: 2)
                 )
             }
+            .sensoryFeedback(.selection, trigger: countryCode)
             
             GrootTextField(
                 placeholder,
@@ -226,7 +233,9 @@ struct GrootSearchField: View {
             
             GrootText("phone field", style: .heading)
             
-            GrootPhoneField(phoneNumber: .constant("5551234567"), countryCode: "+1") { }
+            GrootPhoneField(phoneNumber: .constant("5551234567"), countryCode: "+1", countryFlag: "🇺🇸") { }
+            GrootPhoneField(phoneNumber: .constant("7890123456"), countryCode: "+44", countryFlag: "🇬🇧") { }
+            GrootPhoneField(phoneNumber: .constant(""), countryCode: "+91", countryFlag: "🇮🇳") { }
             
             GrootText("search field", style: .heading)
             

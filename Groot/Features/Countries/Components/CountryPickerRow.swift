@@ -128,6 +128,13 @@ struct BlockedCountryCard: View {
 struct CountrySearchHeader: View {
     @Binding var searchText: String
     let blockedCount: Int
+    let totalCount: Int
+    
+    init(searchText: Binding<String>, blockedCount: Int, totalCount: Int = CountryDataService.shared.countryCount) {
+        self._searchText = searchText
+        self.blockedCount = blockedCount
+        self.totalCount = totalCount
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -147,15 +154,23 @@ struct CountrySearchHeader: View {
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.grootBark)
                     
-                    Text("\(blockedCount) countries blocked")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.grootStone)
+                    HStack(spacing: 4) {
+                        Text("\(blockedCount) blocked")
+                            .foregroundStyle(blockedCount > 0 ? Color.grootFlame : Color.grootStone)
+                        
+                        Text("•")
+                            .foregroundStyle(Color.grootPebble)
+                        
+                        Text("\(totalCount) countries")
+                            .foregroundStyle(Color.grootStone)
+                    }
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
                 }
                 
                 Spacer()
             }
             
-            GrootSearchField("search countries", text: $searchText)
+            GrootSearchField("search \(totalCount) countries", text: $searchText)
         }
     }
 }
