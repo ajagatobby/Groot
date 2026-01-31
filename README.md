@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/YOUR_USERNAME/groot/main/assets/groot-logo.png" alt="Groot Logo" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/ajagatobby/groot/main/assets/groot-logo.png" alt="Groot Logo" width="120" height="120">
 </p>
 
 <h1 align="center">Groot</h1>
@@ -119,7 +119,7 @@ Unlike other call blockers that harvest your data or require expensive subscript
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/groot.git
+git clone https://github.com/ajagatobby/groot.git
 cd groot
 ```
 
@@ -267,7 +267,7 @@ We love contributions! Whether it's fixing bugs, adding features, improving docu
 - [ ] **Testing** — Improve test coverage
 - [ ] **Documentation** — Write guides and tutorials
 - [ ] **Design** — Create app icons and promotional assets
-- [ ] **Features** — Check our [Issues](https://github.com/YOUR_USERNAME/groot/issues) for ideas
+- [ ] **Features** — Check our [Issues](https://github.com/ajagatobby/groot/issues) for ideas
 
 ---
 
