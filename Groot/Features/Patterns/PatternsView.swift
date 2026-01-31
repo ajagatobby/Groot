@@ -356,6 +356,8 @@ struct PatternsTabView: View {
     @Query(sort: \BlockPattern.createdAt, order: .reverse)
     private var patterns: [BlockPattern]
     
+    @AppStorage("hideSuggestedPatterns") private var hideSuggestedPatterns = false
+    
     @State private var showAddSheet = false
     @State private var showToast = false
     @State private var toastMessage = ""
@@ -404,8 +406,12 @@ struct PatternsTabView: View {
                         patternsListSection
                     }
                     
-                    if !availableSuggestions.isEmpty {
+                    if !hideSuggestedPatterns && !availableSuggestions.isEmpty {
                         suggestedPatternsSection
+                    }
+                    
+                    if hideSuggestedPatterns && !availableSuggestions.isEmpty {
+                        showSuggestionsButton
                     }
                     
                     infoCallout
@@ -502,8 +508,21 @@ struct PatternsTabView: View {
     
     private var suggestedPatternsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            GrootText("suggested patterns", style: .heading)
-                .grootAppear(delay: 0.3)
+            HStack {
+                GrootText("suggested patterns", style: .heading)
+                Spacer()
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        hideSuggestedPatterns = true
+                    }
+                    GrootHaptics.selection()
+                } label: {
+                    Text("hide")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.grootStone)
+                }
+            }
+            .grootAppear(delay: 0.3)
             
             VStack(spacing: 0) {
                 ForEach(Array(availableSuggestions.enumerated()), id: \.element.pattern) { index, suggestion in
@@ -523,6 +542,28 @@ struct PatternsTabView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .grootAppear(delay: 0.4)
         }
+    }
+    
+    private var showSuggestionsButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                hideSuggestedPatterns = false
+            }
+            GrootHaptics.selection()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("show suggested patterns")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(Color.grootSky)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.grootSky.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .grootAppear(delay: 0.3)
     }
     
     private var infoCallout: some View {
