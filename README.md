@@ -119,7 +119,7 @@ Unlike other call blockers that harvest your data or require expensive subscript
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/ajagatobby/groot.git
+git clone https://github.com/ajagatobby/Groot.git
 cd groot
 ```
 
@@ -267,7 +267,7 @@ We love contributions! Whether it's fixing bugs, adding features, improving docu
 - [ ] **Testing** — Improve test coverage
 - [ ] **Documentation** — Write guides and tutorials
 - [ ] **Design** — Create app icons and promotional assets
-- [ ] **Features** — Check our [Issues](https://github.com/ajagatobby/groot/issues) for ideas
+- [ ] **Features** — Check our [Issues](https://github.com/ajagatobby/Groot/issues) for ideas
 
 ---
 
