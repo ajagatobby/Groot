@@ -119,6 +119,7 @@ struct GrootTabBar: View {
                         isSelected: selectedTab == index,
                         namespace: tabNamespace
                     ) {
+                        guard selectedTab != index else { return }
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                             selectedTab = index
                         }
@@ -141,13 +142,12 @@ struct GrootTabItem: View {
     let namespace: Namespace.ID
     let action: () -> Void
     
-    @State private var isPressed = false
-    @State private var iconBounce = false
+    @State private var bounceValue: Int = 0
     
     var body: some View {
         Button {
+            bounceValue += 1
             action()
-            triggerIconBounce()
         } label: {
             VStack(spacing: 4) {
                 ZStack {
@@ -161,28 +161,17 @@ struct GrootTabItem: View {
                     
                     // Icon with badge
                     ZStack(alignment: .topTrailing) {
-                        // Animated icon
-                        ZStack {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 22, weight: .medium))
-                                .foregroundStyle(Color.grootPebble)
-                                .opacity(isSelected ? 0 : 1)
-                                .scaleEffect(isSelected ? 0.6 : 1)
-                            
-                            Image(systemName: tab.selectedIcon)
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color.grootShield)
-                                .opacity(isSelected ? 1 : 0)
-                                .scaleEffect(isSelected ? 1 : 0.6)
-                        }
-                        .scaleEffect(iconBounce ? 1.2 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: iconBounce)
+                        // SF Symbol with native animation
+                        Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
+                            .font(.system(size: 22, weight: isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? Color.grootShield : Color.grootPebble)
+                            .contentTransition(.symbolEffect(.replace.downUp.byLayer))
+                            .symbolEffect(.bounce.down, value: bounceValue)
                         
                         // Badge
                         if let badge = tab.badge, badge > 0 {
                             BadgeView(count: badge)
                                 .offset(x: 10, y: -6)
-                                .transition(.scale.combined(with: .opacity))
                         }
                     }
                 }
@@ -192,19 +181,11 @@ struct GrootTabItem: View {
                 Text(tab.label.lowercased())
                     .font(.system(size: 10, weight: isSelected ? .bold : .semibold, design: .rounded))
                     .foregroundStyle(isSelected ? Color.grootShield : Color.grootPebble)
+                    .animation(.easeInOut(duration: 0.2), value: isSelected)
             }
             .frame(maxWidth: .infinity)
-            .scaleEffect(isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isPressed)
         }
-        .buttonStyle(TabButtonStyle(isPressed: $isPressed))
-    }
-    
-    private func triggerIconBounce() {
-        iconBounce = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            iconBounce = false
-        }
+        .buttonStyle(TabPressStyle())
     }
 }
 
@@ -212,8 +193,6 @@ struct GrootTabItem: View {
 
 struct BadgeView: View {
     let count: Int
-    
-    @State private var appeared = false
     
     var body: some View {
         Text(count > 99 ? "99+" : "\(count)")
@@ -223,26 +202,17 @@ struct BadgeView: View {
             .padding(.vertical, 2)
             .background(Color.grootFlame)
             .clipShape(Capsule())
-            .scaleEffect(appeared ? 1.0 : 0.5)
-            .opacity(appeared ? 1.0 : 0)
-            .onAppear {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                    appeared = true
-                }
-            }
+            .transition(.scale.combined(with: .opacity))
     }
 }
 
-// MARK: - Tab Button Style
+// MARK: - Tab Press Style
 
-struct TabButtonStyle: ButtonStyle {
-    @Binding var isPressed: Bool
-    
+struct TabPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { _, newValue in
-                isPressed = newValue
-            }
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
