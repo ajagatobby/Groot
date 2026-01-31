@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/groot-logo.png" alt="Groot Logo" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/ajagatobby/Groot/main/assets/groot-logo.png" alt="Groot Logo" width="120" height="120">
 </p>
 
 <h1 align="center">Groot</h1>
