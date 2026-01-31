@@ -192,7 +192,15 @@ struct GrootSwipeableListItem<Content: View>: View {
     }
     
     @State private var offset: CGFloat = 0
-    @State private var isSwiped = false
+    @State private var initialOffset: CGFloat = 0
+    
+    private var maxLeadingOffset: CGFloat {
+        CGFloat(leadingActions.count) * 70
+    }
+    
+    private var maxTrailingOffset: CGFloat {
+        CGFloat(trailingActions.count) * -70
+    }
     
     init(
         leadingActions: [SwipeAction] = [],
@@ -210,9 +218,7 @@ struct GrootSwipeableListItem<Content: View>: View {
                 ForEach(leadingActions.indices, id: \.self) { index in
                     Button {
                         leadingActions[index].action()
-                        withAnimation(.grootSnappy) {
-                            offset = 0
-                        }
+                        closeSwipe()
                     } label: {
                         Image(systemName: leadingActions[index].icon)
                             .font(.system(size: 20, weight: .semibold))
@@ -228,9 +234,7 @@ struct GrootSwipeableListItem<Content: View>: View {
                 ForEach(trailingActions.indices, id: \.self) { index in
                     Button {
                         trailingActions[index].action()
-                        withAnimation(.grootSnappy) {
-                            offset = 0
-                        }
+                        closeSwipe()
                     } label: {
                         Image(systemName: trailingActions[index].icon)
                             .font(.system(size: 20, weight: .semibold))
@@ -248,34 +252,79 @@ struct GrootSwipeableListItem<Content: View>: View {
                 .gesture(
                     DragGesture()
                         .onChanged { value in
-                            let maxLeading = CGFloat(leadingActions.count) * 70
-                            let maxTrailing = CGFloat(trailingActions.count) * -70
+                            let newOffset = initialOffset + value.translation.width
                             
-                            if value.translation.width > 0 && !leadingActions.isEmpty {
-                                offset = min(value.translation.width, maxLeading)
-                            } else if value.translation.width < 0 && !trailingActions.isEmpty {
-                                offset = max(value.translation.width, maxTrailing)
+                            // Allow swiping in both directions
+                            // Clamp offset between maxTrailing and maxLeading
+                            if !leadingActions.isEmpty && !trailingActions.isEmpty {
+                                // Has both actions - allow full range
+                                offset = min(max(newOffset, maxTrailingOffset), maxLeadingOffset)
+                            } else if !leadingActions.isEmpty {
+                                // Only leading actions - allow 0 to maxLeading with rubber band for negative
+                                if newOffset < 0 {
+                                    offset = newOffset * 0.3 // Rubber band effect
+                                } else {
+                                    offset = min(newOffset, maxLeadingOffset)
+                                }
+                            } else if !trailingActions.isEmpty {
+                                // Only trailing actions - allow maxTrailing to 0 with rubber band for positive
+                                if newOffset > 0 {
+                                    offset = newOffset * 0.3 // Rubber band effect
+                                } else {
+                                    offset = max(newOffset, maxTrailingOffset)
+                                }
                             }
                         }
                         .onEnded { value in
                             let threshold: CGFloat = 50
+                            let velocity = value.velocity.width
                             
-                            withAnimation(.grootSnappy) {
-                                if offset > threshold {
-                                    offset = CGFloat(leadingActions.count) * 70
-                                    isSwiped = true
-                                } else if offset < -threshold {
-                                    offset = CGFloat(trailingActions.count) * -70
-                                    isSwiped = true
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                // Use velocity to help determine intent
+                                if velocity > 500 {
+                                    // Fast swipe right
+                                    if !leadingActions.isEmpty {
+                                        offset = maxLeadingOffset
+                                    } else {
+                                        offset = 0
+                                    }
+                                } else if velocity < -500 {
+                                    // Fast swipe left
+                                    if !trailingActions.isEmpty {
+                                        offset = maxTrailingOffset
+                                    } else {
+                                        offset = 0
+                                    }
                                 } else {
-                                    offset = 0
-                                    isSwiped = false
+                                    // Slow swipe - use position threshold
+                                    if offset > threshold && !leadingActions.isEmpty {
+                                        offset = maxLeadingOffset
+                                    } else if offset < -threshold && !trailingActions.isEmpty {
+                                        offset = maxTrailingOffset
+                                    } else {
+                                        offset = 0
+                                    }
                                 }
+                                
+                                initialOffset = offset
                             }
                         }
                 )
+                .onTapGesture {
+                    // Tap to close if swiped open
+                    if offset != 0 {
+                        closeSwipe()
+                    }
+                }
         }
         .clipShape(RoundedRectangle(cornerRadius: 0))
+    }
+    
+    private func closeSwipe() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            offset = 0
+            initialOffset = 0
+        }
     }
 }
 
