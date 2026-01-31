@@ -16,6 +16,7 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 0
+    @State private var previousTab = 0
     @State private var callBlockingService = CallBlockingService()
     
     @Query private var blockedNumbers: [BlockedNumber]
@@ -33,6 +34,9 @@ struct ContentView: View {
         .onAppear {
             callBlockingService.configure(with: modelContext)
         }
+        .onChange(of: selectedTab) { oldValue, newValue in
+            previousTab = oldValue
+        }
     }
     
     // MARK: - View Components
@@ -40,21 +44,21 @@ struct ContentView: View {
     /// Maintains all views in memory to preserve animation state
     private var tabContent: some View {
         ZStack {
-            HomeView()
-                .opacity(selectedTab == 0 ? 1 : 0)
-                .zIndex(selectedTab == 0 ? 1 : 0)
+            TabContentView(index: 0, selectedTab: selectedTab, previousTab: previousTab) {
+                HomeView()
+            }
             
-            PatternsTabView()
-                .opacity(selectedTab == 1 ? 1 : 0)
-                .zIndex(selectedTab == 1 ? 1 : 0)
+            TabContentView(index: 1, selectedTab: selectedTab, previousTab: previousTab) {
+                PatternsTabView()
+            }
             
-            CountriesView()
-                .opacity(selectedTab == 2 ? 1 : 0)
-                .zIndex(selectedTab == 2 ? 1 : 0)
+            TabContentView(index: 2, selectedTab: selectedTab, previousTab: previousTab) {
+                CountriesView()
+            }
             
-            SettingsView()
-                .opacity(selectedTab == 3 ? 1 : 0)
-                .zIndex(selectedTab == 3 ? 1 : 0)
+            TabContentView(index: 3, selectedTab: selectedTab, previousTab: previousTab) {
+                SettingsView()
+            }
         }
     }
     
@@ -86,6 +90,39 @@ struct ContentView: View {
                 )
             ]
         )
+    }
+}
+
+// MARK: - Tab Content View
+
+/// Animated container for tab content with scale and fade transitions
+struct TabContentView<Content: View>: View {
+    let index: Int
+    let selectedTab: Int
+    let previousTab: Int
+    @ViewBuilder let content: () -> Content
+    
+    private var isSelected: Bool { index == selectedTab }
+    private var wasSelected: Bool { index == previousTab }
+    
+    // Determine slide direction based on tab indices
+    private var slideDirection: CGFloat {
+        if isSelected {
+            return selectedTab > previousTab ? 1 : -1
+        } else if wasSelected {
+            return selectedTab > previousTab ? -1 : 1
+        }
+        return 0
+    }
+    
+    var body: some View {
+        content()
+            .opacity(isSelected ? 1 : 0)
+            .scaleEffect(isSelected ? 1 : 0.96)
+            .offset(x: isSelected ? 0 : slideDirection * 20)
+            .zIndex(isSelected ? 1 : 0)
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: selectedTab)
+            .allowsHitTesting(isSelected)
     }
 }
 
