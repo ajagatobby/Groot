@@ -199,7 +199,7 @@ struct GrootIconButton: View {
         case medium
         case large
         
-        var size: CGFloat {
+        var tapSize: CGFloat {
             switch self {
             case .small: return 36
             case .medium: return 44
@@ -209,17 +209,9 @@ struct GrootIconButton: View {
         
         var iconSize: CGFloat {
             switch self {
-            case .small: return 16
-            case .medium: return 20
-            case .large: return 24
-            }
-        }
-        
-        var cornerRadius: CGFloat {
-            switch self {
-            case .small: return 10
-            case .medium: return 12
-            case .large: return 14
+            case .small: return 20
+            case .medium: return 24
+            case .large: return 28
             }
         }
     }
@@ -236,19 +228,40 @@ struct GrootIconButton: View {
         self.action = action
     }
     
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: size.iconSize, weight: .bold))
-                .foregroundStyle(variant.colors.foreground)
-                .frame(width: size.size, height: size.size)
+    private var iconColor: Color {
+        switch variant {
+        case .primary: return .grootShield
+        case .secondary: return .grootStone
+        case .danger: return .grootFlame
+        case .warning: return .grootSun
+        case .ghost: return .grootStone
+        case .premium: return .grootSun
         }
-        .buttonStyle(GrootButtonStyle(
-            backgroundColor: variant.colors.background,
-            shadowColor: variant.colors.shadow,
-            cornerRadius: size.cornerRadius,
-            isDisabled: false
-        ))
+    }
+    
+    var body: some View {
+        Button {
+            GrootHaptics.selection()
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: size.iconSize, weight: .semibold))
+                .foregroundStyle(iconColor)
+                .frame(width: size.tapSize, height: size.tapSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(IconButtonStyle())
+    }
+}
+
+// MARK: - Icon Button Style
+
+private struct IconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : 1.0)
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 

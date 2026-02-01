@@ -393,28 +393,120 @@ struct PermissionItem: Identifiable {
     var status: PermissionStatus = .notDetermined
 }
 
-// MARK: - Permissions Header
+// MARK: - Permissions Header (Duolingo-Style Progress)
 
 struct PermissionsHeader: View {
     var currentIndex: Int
     var totalCount: Int
     
+    private var progress: CGFloat {
+        guard totalCount > 0 else { return 0 }
+        return CGFloat(currentIndex + 1) / CGFloat(totalCount)
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
-            // Progress dots
-            HStack(spacing: 8) {
-                ForEach(0..<totalCount, id: \.self) { index in
-                    Circle()
-                        .fill(index <= currentIndex ? Color.grootShield : Color.grootMist)
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(index == currentIndex ? 1.3 : 1.0)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentIndex)
+            // Duolingo-style progress bar
+            DuoProgressBar(progress: progress, height: 16)
+            
+            HStack {
+                Text("setup permissions")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.grootStone)
+                
+                Spacer()
+                
+                Text("\(currentIndex + 1)/\(totalCount)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.grootShield)
+            }
+        }
+    }
+}
+
+// MARK: - Duolingo-Style Progress Bar
+
+struct DuoProgressBar: View {
+    let progress: CGFloat
+    let height: CGFloat
+    
+    // Duolingo colors
+    private let trackColor = Color(red: 229/255, green: 229/255, blue: 229/255) // #E5E5E5
+    private let fillColor = Color.grootShield
+    private let highlightColor = Color.grootLeaf
+    
+    @State private var animatedProgress: CGFloat = 0
+    @State private var showShine = false
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Track (background)
+                Capsule()
+                    .fill(trackColor)
+                    .frame(height: height)
+                
+                // Progress fill with 3D effect
+                ZStack(alignment: .leading) {
+                    // Main fill
+                    Capsule()
+                        .fill(fillColor)
+                        .frame(width: max(height, geometry.size.width * animatedProgress), height: height)
+                    
+                    // Top highlight (gives 3D look)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [highlightColor.opacity(0.6), Color.clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                        .frame(width: max(height, geometry.size.width * animatedProgress), height: height / 2)
+                        .offset(y: -height / 4)
+                        .clipShape(Capsule())
+                    
+                    // Shine effect on progress change
+                    if showShine {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0), Color.white.opacity(0.4), Color.white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 40, height: height)
+                            .offset(x: geometry.size.width * animatedProgress - 20)
+                            .clipShape(Capsule())
+                    }
                 }
+                .clipShape(Capsule())
+            }
+        }
+        .frame(height: height)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                animatedProgress = progress
+            }
+        }
+        .onChange(of: progress) { oldValue, newValue in
+            // Animate progress change
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                animatedProgress = newValue
             }
             
-            Text("setup permissions")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.grootStone)
+            // Show shine effect when progress increases
+            if newValue > oldValue {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showShine = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showShine = false
+                    }
+                }
+            }
         }
     }
 }

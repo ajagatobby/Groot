@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "groot-logo.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -12,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "groot-logo 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
